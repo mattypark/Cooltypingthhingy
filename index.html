@@ -849,6 +849,7 @@
         }
         if (/[?&]tgtest/.test(location.search)) window.__tg = this;
         this.peers = new Map();
+        this.gifts = [];
         this.liveInit();
 
         // widths were measured with the fallback face until the web font arrives
@@ -1835,6 +1836,7 @@
         this.sentX = null;
         this.sentY = null;
         this.roster = {};
+        window.addEventListener('pointerdown', e => this.plant(e));
         // pointer left the window
         document.addEventListener('mouseout', e => {
           if (!e.relatedTarget) {
@@ -1882,6 +1884,7 @@
               return out;
             };
             ch.on('broadcast', { event: 'p' }, ({ payload }) => this.livePeer(payload))
+              .on('broadcast', { event: 'r' }, ({ payload }) => this.liveRose(payload))
               .on('presence', { event: 'sync' }, () => this.livePresence(meta()))
               .subscribe(status => {
                 if (status === 'SUBSCRIBED') ch.track({ n: this.me.n, c: this.me.c });
@@ -1947,6 +1950,8 @@
             publish();
           } else if (d.k === 'p') {
             this.livePeer(d.payload);
+          } else if (d.k === 'r') {
+            this.liveRose(d.payload);
           }
         };
         beat();
@@ -1959,6 +1964,39 @@
             bc.close();
           }
         };
+      }
+
+      // double-click / double-tap on the garden leaves a rose there for everyone (one every 1.8 s at most)
+      plant(e) {
+        if (this.state.mode !== 'type' || e.target !== this.el.canvas) return;
+        const now = performance.now();
+        const lp = this.lastTap;
+        this.lastTap = { t: now, x: e.clientX, y: e.clientY };
+        const double = lp && now - lp.t < 340 && Math.hypot(e.clientX - lp.x, e.clientY - lp.y) < 40;
+        if (!double || now - (this.lastPlant || 0) <= 1800) return;
+        this.lastPlant = now;
+        this.lastTap = null;
+        const g = {
+          x: Math.round(e.clientX / this.W * 1000) / 1000,
+          y: Math.round(e.clientY / this.H * 1000) / 1000,
+          s: Math.floor(Math.random() * 1e6)
+        };
+        this.liveRose(g);
+        this.liveSend('r', g);
+      }
+
+      // a planted rose at (x, y) in screen fractions; its seed s shapes it the same for everyone
+      liveRose(g) {
+        if (!g || typeof g.x !== 'number' || typeof g.y !== 'number') return;
+        const r = this.rng((g.s | 0) || 1);
+        this.gifts.push({
+          x: Math.min(1, Math.max(0, g.x)),
+          y: Math.min(1, Math.max(0, g.y)),
+          t0: performance.now(),
+          rot: (r() - 0.5) * 0.8,
+          e: { ph1: r() * 6.283, ph2: r() * 6.283, turns: 1.4 + r() * 0.5 }
+        });
+        if (this.gifts.length > 14) this.gifts.shift();
       }
 
       liveClose() {
@@ -2269,6 +2307,18 @@
         const st = this.mainState();
         this.render(B, now, st);
         this.drawFlies(B, now, st.C);
+        // planted roses last a minute, then droop, shrink and fade over their last two seconds
+        if (caret && this.gifts.length) {
+          const LIFE = 60000;
+          this.gifts = this.gifts.filter(gf => now - gf.t0 < LIFE);
+          for (const gf of this.gifts) {
+            const age = now - gf.t0;
+            const w = 1 - this.eo((age - (LIFE - 2200)) / 2200);
+            g.globalAlpha = Math.max(0, w);
+            this.rose(B, gf.x * this.W, gf.y * this.H + (1 - w) * this.Sd * 0.3, this.Sd * 0.24 * (0.65 + 0.35 * w), gf.rot + (1 - w) * 0.6, gf.e, age, null);
+          }
+          g.globalAlpha = 1;
+        }
         if (caret) {
           // solid while typing, blinking when idle; grows in on first load
           const S = this.Sd;
