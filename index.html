@@ -65,12 +65,139 @@
       caret-color: transparent;
       pointer-events: none;
     }
+
+    .tg-app button {
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+
+    /* ---------- bottom bar ---------- */
+    .tg-bar {
+      position: absolute;
+      left: calc(24px + env(safe-area-inset-left));
+      right: calc(24px + env(safe-area-inset-right));
+      bottom: calc(20px + env(safe-area-inset-bottom));
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      opacity: 0.6;
+    }
+
+    .tg-hints {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .tg-coarse {
+      display: none;
+    }
+
+    @media (pointer: coarse) {
+      .tg-fine {
+        display: none;
+      }
+
+      .tg-coarse {
+        display: inline;
+      }
+    }
+
+    .tg-ctrls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .tg-pal {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      padding: 4px 6px;
+      border: 1px solid #3A3A3A;
+      border-radius: 999px;
+    }
+
+    .tg-swatch {
+      width: 22px;
+      height: 22px;
+      padding: 0;
+      border-radius: 999px;
+      border: 1.5px solid transparent;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transform: scale(var(--scale, 1));
+    }
+
+    .tg-swatch:hover {
+      transform: scale(1.15);
+    }
+
+    .tg-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+    }
+
+    @media (max-width: 600px) {
+      .tg-bar {
+        left: calc(16px + env(safe-area-inset-left));
+        right: calc(16px + env(safe-area-inset-right));
+        bottom: calc(14px + env(safe-area-inset-bottom));
+        gap: 10px;
+      }
+
+      .tg-hints {
+        gap: 12px;
+        font-size: 11px;
+      }
+
+      .tg-ctrls {
+        flex: 1 1 100%;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .tg-pal {
+        gap: 4px;
+      }
+
+      /* ten swatches share whatever width is left */
+      .tg-swatch {
+        --sw: clamp(13px, calc((100vw - 183px) / 10), 22px);
+        width: var(--sw);
+        height: var(--sw);
+      }
+
+      .tg-dot {
+        width: calc(var(--sw) * 0.46);
+        height: calc(var(--sw) * 0.46);
+      }
+    }
   </style>
 </head>
 <body>
   <div class="tg-app">
     <canvas class="tg-canvas"></canvas>
     <input class="tg-input" aria-label="Type to grow a garden" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false">
+
+    <div class="tg-bar">
+      <div class="tg-hints">
+        <span class="tg-fine">type to grow</span><span class="tg-coarse">tap to type</span>
+        <span>space cuts</span>
+        <span class="tg-fine">backspace withers</span><span class="tg-coarse">⌫ withers</span>
+        <span class="tg-fine">enter clears</span><span class="tg-coarse">return clears</span>
+      </div>
+      <div class="tg-ctrls">
+        <div class="tg-pal" role="group" aria-label="Palette"></div>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -81,7 +208,8 @@
     const SETTINGS = {
       boil: true, // lines redraw with a little jitter, like hand-drawn animation
       recoil: 20, // px a cut tendril springs back (0–80)
-      density: 1 // 0.5–1.6: how leafy and bridged each word grows
+      density: 1, // 0.5–1.6: how leafy and bridged each word grows
+      showHint: true // the bottom bar in the typing view
     };
 
     // name, background, flower, stem & leaf, flower line, type
@@ -105,9 +233,17 @@
         this.el = {
           app: document.querySelector('.tg-app'),
           canvas: document.querySelector('.tg-canvas'),
-          input: document.querySelector('.tg-input')
+          input: document.querySelector('.tg-input'),
+          bar: document.querySelector('.tg-bar'),
+          pal: document.querySelector('.tg-pal')
         };
         this.mount();
+      }
+
+      setState(patch, cb) {
+        this.state = { ...this.state, ...patch };
+        this.renderUI();
+        if (cb) cb();
       }
 
       mount() {
@@ -121,6 +257,7 @@
         this.lastKey = 0;
         this.rand = Math.random;
         this.g = this.el.canvas.getContext('2d');
+        this.buildUI();
 
         window.addEventListener('resize', () => this.resize());
         this.resize();
@@ -155,6 +292,54 @@
         };
         loop();
         setTimeout(() => this.el.input.focus({ preventScroll: true }), 50);
+        this.renderUI();
+      }
+
+      // ---------- interface ----------
+      buildUI() {
+        this.ui = { swatches: [] };
+        PALETTES.forEach(([name, bg, flower], i) => {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'tg-swatch';
+          b.title = name;
+          b.setAttribute('aria-label', name);
+          b.style.background = bg;
+          const dot = document.createElement('span');
+          dot.className = 'tg-dot';
+          dot.style.background = flower;
+          b.appendChild(dot);
+          b.addEventListener('click', e => this.pickPalette(i, e));
+          this.el.pal.appendChild(b);
+          this.ui.swatches.push(b);
+        });
+      }
+
+      pickPalette(i, e) {
+        e.stopPropagation();
+        this.setState({ palette: i }, () => this.refocus());
+      }
+
+      // after a bar button, typing carries on
+      refocus() {
+        if (this.state.mode === 'type') this.el.input.focus({ preventScroll: true });
+      }
+
+      renderUI() {
+        const s = this.state;
+        const isType = s.mode === 'type';
+        const pc = this.pal();
+        this.el.app.style.background = pc.bg;
+        this.el.bar.hidden = !(isType && this.props.showHint);
+        this.el.bar.style.color = pc.C.text;
+        this.el.pal.style.background = pc.bg;
+        this.ui.swatches.forEach((b, i) => {
+          const on = s.palette === i;
+          // ring the chosen one; outline any that would vanish into the current background
+          b.style.borderColor = on ? pc.C.text : PALETTES[i][1] === pc.bg ? '#3A3A3A' : 'transparent';
+          b.style.setProperty('--scale', on ? 1.1 : 1);
+          b.setAttribute('aria-pressed', String(on));
+        });
       }
 
       // ---------- math ----------
