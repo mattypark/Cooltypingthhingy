@@ -571,7 +571,11 @@
     const PRESETS = [
       { id: 'breathe', label: 'Breathe', sub: 'Slow sway · 3s', T: 3000 },
       { id: 'grow', label: 'Grow & wither', sub: 'Bloom, then back · 6s', T: 6000 },
-      { id: 'typed', label: 'Typed', sub: 'Type, cut, repeat · 5s', T: 5000 }
+      { id: 'typed', label: 'Typed', sub: 'Type, cut, repeat · 5s', T: 5000 },
+      { id: 'wind', label: 'Gust', sub: 'Wind sweeps through · 4s', T: 4000 },
+      { id: 'reach', label: 'Reach', sub: 'Stems follow a light · 6s', T: 6000 },
+      { id: 'scatter', label: 'Scatter', sub: 'Random bloom, fade · 6s', T: 6000 },
+      { id: 'visit', label: 'Visitor', sub: 'Butterfly drops by · 7s', T: 7000 }
     ];
 
     // name, background, flower, stem & leaf, flower line, type
@@ -2054,12 +2058,19 @@
         L.forEach((l, i) => {
           l.b = off + i * step;
         });
+        if (pr.id === 'scatter') {
+          const r = this.rng(s.seed * 31 + 5);
+          L.forEach(l => {
+            l.b = 150 + r() * 2400;
+          });
+        }
         const wd = Math.min(60, 900 / n);
         L.forEach((l, i) => {
-          l.d = 4200 + (n - 1 - i) * wd;
+          l.d = pr.id === 'scatter' ? 4700 + i * 8 : 4200 + (n - 1 - i) * wd;
           const nx = L[i + 1];
           l.cutRel = null;
-          if (l.ch !== ' ' && nx && nx.ch === ' ') {
+          // scattered letters bloom out of order, so no word ends get cut
+          if (pr.id !== 'scatter' && l.ch !== ' ' && nx && nx.ch === ' ') {
             l.cutRel = Math.max(30, nx.b - l.b);
             this.genEnd(l, l.cutRel);
           }
@@ -2155,11 +2166,52 @@
             return [x + Math.sin(ph + l.x * 0.004 + h * 1.1) * S * 0.03 * h, y + Math.cos(ph + x * 0.003) * S * 0.008 * h];
           };
           st.rotw = e => Math.sin(ph + e.id * 0.7) * 0.12;
-        } else if (P.preset === 'grow') {
+        } else if (P.preset === 'grow' || P.preset === 'scatter') {
           set(0);
           L.forEach(l => {
             if (tt >= l.d) l.dead = l.d;
           });
+        } else if (P.preset === 'wind') {
+          set(-1e5);
+          const S = P.S;
+          const front = -0.35 + tt / P.T * 1.9;
+          // the gust at d (fraction of the width past its front): a decaying ripple behind, a swell ahead
+          const gust = d => (d < 0 ? Math.exp(d * 2.2) * Math.cos(-d * 9) : Math.exp(-d * d * 30));
+          st.warp = (x, y, l) => {
+            const hh = Math.max(0, (l.y - y) / S);
+            const w = gust(l.x / 1080 - front);
+            const idle = Math.sin(tt / 1000 * 1.6 + l.x * 0.01) * 0.012;
+            return [x + (w * 0.13 + idle) * S * hh * hh * 0.6 + (w * 0.13 + idle) * S * hh * 0.4, y + Math.abs(w) * 0.02 * S * hh];
+          };
+          st.rotw = e => gust(e.x / 1080 - front) * 0.35;
+        } else if (P.preset === 'reach') {
+          set(-1e5);
+          const S = P.S;
+          const ph = tt / P.T * Math.PI * 2;
+          // a light travels a figure eight; stems bend toward it, the nearer the more
+          const lx = 540 + Math.sin(ph) * 430;
+          const ly = 540 + Math.sin(ph * 2) * 260;
+          this._light = [lx, ly];
+          st.warp = (x, y, l) => {
+            const dx = lx - l.x;
+            const dy = ly - (l.y - S * 0.6);
+            const d = Math.hypot(dx, dy) || 1;
+            const w = Math.max(0, 1 - d / 560);
+            const s = w * w * (3 - 2 * w);
+            const hh = Math.min(2.5, Math.max(0, (l.y - y) / S));
+            const f = hh * hh * 0.5 + hh * 0.5;
+            return [x + dx / d * s * S * 0.12 * f, y + dy / d * s * S * 0.06 * f];
+          };
+          st.rotw = e => Math.sin(Math.atan2(ly - e.y, lx - e.x)) * 0.15;
+        } else if (P.preset === 'visit') {
+          set(-1e5);
+          st.perchOn = true;
+          this.perch = [];
+          const ph = tt / P.T * Math.PI * 2;
+          st.warp = (x, y, l) => {
+            const hh = Math.max(0, (l.y - y) / P.S);
+            return [x + Math.sin(ph + l.x * 0.004 + hh) * P.S * 0.015 * hh, y];
+          };
         } else {
           // typed: letters arrive one by one, then the loop rests empty
           if (tt >= 4400) return;
@@ -2170,6 +2222,17 @@
 
         this.render(B, tt, st);
 
+        if (P.preset === 'reach') {
+          const [lx, ly] = this._light;
+          const r = P.S * 0.09;
+          const pts = [];
+          for (let k = 0; k < 20; k++) {
+            const a = k / 20 * Math.PI * 2;
+            pts.push([lx + Math.cos(a) * r, ly + Math.sin(a) * r]);
+          }
+          B.fill(pts, st.C.line);
+        }
+        if (P.preset === 'visit') this.posterFly(B, tt, P, st.C);
         if (P.preset === 'typed') {
           const born = st.letters;
           const last = born[born.length - 1];
@@ -2182,6 +2245,57 @@
             B.rect(x - w / 2, y - h / 2, w, h, st.C.text);
           }
         }
+      }
+
+      // the Visitor's butterfly: in from the left, rests on one rose, hops to another, leaves to the right
+      posterFly(B, tt, P, C) {
+        const ps = this.perch.slice().sort((a, b) => a.x - b.x);
+        if (!ps.length) return;
+        const p1 = ps[Math.floor(ps.length * 0.25)];
+        const p2 = ps[Math.min(ps.length - 1, Math.floor(ps.length * 0.75))];
+        const A = [-80, 300];
+        const s1 = [p1.x, p1.y - p1.R * 0.55];
+        const s2 = [p2.x, p2.y - p2.R * 0.55];
+        const E = [1160, 260];
+        const sz = Math.max(12, P.S * 0.09);
+        const t = tt / 1000;
+        const eo = v => this.eo(Math.max(0, Math.min(1, v)));
+        // eased flight from a to b, arcing up by lift
+        const leg = (a, b, u, lift) => {
+          const e = eo(u);
+          return [a[0] + (b[0] - a[0]) * e, a[1] + (b[1] - a[1]) * e - Math.sin(e * Math.PI) * lift];
+        };
+        let p;
+        let flying = true;
+        let vx = 0;
+        if (t < 1.8) {
+          p = leg(A, s1, t / 1.8, 160);
+          vx = 1;
+        } else if (t < 3.4) {
+          p = s1;
+          flying = false;
+        } else if (t < 4.6) {
+          p = leg(s1, s2, (t - 3.4) / 1.2, 140);
+          vx = s2[0] > s1[0] ? 1 : -1;
+        } else if (t < 5.8) {
+          p = s2;
+          flying = false;
+        } else {
+          p = leg(s2, E, (t - 5.8) / 1.2, 60);
+          vx = 1;
+        }
+        let o;
+        let ang;
+        if (flying) {
+          o = Math.abs(Math.cos(t * 17));
+          p = [p[0] + Math.sin(t * 7) * 6, p[1] + Math.sin(t * 13) * 4];
+          ang = vx * 0.3;
+        } else {
+          const burst = (t > 2.4 && t < 2.8) || (t > 5 && t < 5.3);
+          o = burst ? 0.2 + 0.8 * Math.abs(Math.cos(t * 9)) : 0.3 + 0.1 * Math.sin(t * 3);
+          ang = 0;
+        }
+        this.butterfly(B, p[0], p[1], sz, ang, o, C);
       }
 
       // ---------- export ----------
