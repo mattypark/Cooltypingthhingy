@@ -79,6 +79,92 @@
       touch-action: manipulation;
     }
 
+    /* ---------- other gardeners ---------- */
+    .tg-peers {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+      z-index: 4;
+    }
+
+    .tg-peer {
+      position: absolute;
+      left: 0;
+      top: 0;
+      will-change: transform;
+      transition: opacity 0.45s;
+      font-family: 'DM Mono', ui-monospace, monospace;
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      line-height: 1;
+    }
+
+    .tg-peer svg {
+      display: block;
+      overflow: visible;
+    }
+
+    .tg-peer span {
+      position: absolute;
+      left: 14px;
+      top: 18px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      color: #000;
+      white-space: nowrap;
+    }
+
+    @media (max-width: 600px) {
+      .tg-peer {
+        font-size: 10px;
+      }
+
+      .tg-peer svg {
+        width: 15px;
+        height: 17px;
+      }
+
+      .tg-peer span {
+        left: 12px;
+        top: 15px;
+        padding: 3px 7px;
+      }
+    }
+
+    .tg-count:empty {
+      display: none;
+    }
+
+    .tg-count::before {
+      content: "";
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+      margin-right: 8px;
+      vertical-align: 1px;
+      animation: tg-live 2.4s ease-in-out infinite;
+    }
+
+    @keyframes tg-live {
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.3;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .tg-count::before {
+        animation: none;
+      }
+    }
+
     /* phones: fit the app to the area the keyboard leaves visible */
     html[data-touch] .tg-app {
       touch-action: none;
@@ -536,6 +622,7 @@
 <body>
   <div class="tg-app">
     <canvas class="tg-canvas"></canvas>
+    <div class="tg-peers" aria-hidden="true"></div>
     <input class="tg-input" aria-label="Type to grow a garden" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false">
 
     <div class="tg-modes" role="group" aria-label="Mode">
@@ -549,6 +636,7 @@
         <span>space cuts</span>
         <span class="tg-fine">backspace withers</span><span class="tg-coarse">⌫ withers</span>
         <span class="tg-fine">enter clears</span><span class="tg-coarse">return clears</span>
+        <span class="tg-count"></span>
       </div>
       <div class="tg-ctrls">
         <div class="tg-pal" role="group" aria-label="Palette"></div>
@@ -603,6 +691,16 @@
     'use strict';
 
     const FONT = '"Playfair Display", Georgia, serif';
+
+    // Optional shared garden: everyone on the page sees each other's cursors. Add a Supabase project URL and
+    // its publishable (anon) key to turn it on; only Realtime broadcast and presence are used, no tables.
+    // Without them the page gardens alone, and ?tglocal links tabs in one browser instead.
+    const LIVE = { url: '', key: '' };
+    const SUPABASE_JS = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
+
+    // each visitor gets a flower name and a cursor tint
+    const FLOWERS = ['iris', 'fern', 'poppy', 'tulip', 'violet', 'clover', 'daisy', 'lilac', 'aster', 'peony', 'sorrel', 'yarrow', 'thistle', 'bluebell', 'foxglove', 'primrose'];
+    const TINTS = ['#FF8A00', '#E63CFF', '#7FD18B', '#9FB4FF', '#FFB7C5', '#FFE2B8', '#2FB8A6', '#FFD23F'];
     // kept in the hidden field so Backspace on an empty field still reports
     const SENT = '​';
     // the SVG export pulls the face in itself, so the file renders right on its own in a browser
@@ -648,6 +746,8 @@
         this.el = {
           app: $('.tg-app'),
           canvas: $('.tg-canvas'),
+          peers: $('.tg-peers'),
+          count: $('.tg-count'),
           input: $('.tg-input'),
           modes: $('.tg-modes'),
           bar: $('.tg-bar'),
@@ -748,6 +848,8 @@
           this.syncVV();
         }
         if (/[?&]tgtest/.test(location.search)) window.__tg = this;
+        this.peers = new Map();
+        this.liveInit();
 
         // widths were measured with the fallback face until the web font arrives
         if (document.fonts) {
@@ -874,6 +976,7 @@
         const pr = this.preset();
         this.el.app.style.background = pc.bg;
         this.el.canvas.style.display = isType ? 'block' : 'none';
+        this.el.peers.style.display = isType ? 'block' : 'none';
         this.ui.modes.forEach(b => b.setAttribute('aria-pressed', String(s.mode === b.dataset.mode)));
         this.el.bar.hidden = !(isType && this.props.showHint);
         this.el.bar.style.color = pc.C.text;
@@ -1723,6 +1826,265 @@
         }
       }
 
+      // ---------- live: other gardeners ----------
+      liveInit() {
+        const pick = a => a[Math.floor(Math.random() * a.length)];
+        this.me = { id: Math.random().toString(36).slice(2, 10), n: pick(FLOWERS), c: pick(TINTS) };
+        this.others = 0;
+        this.lastSend = 0;
+        this.sentX = null;
+        this.sentY = null;
+        this.roster = {};
+        // pointer left the window
+        document.addEventListener('mouseout', e => {
+          if (!e.relatedTarget) {
+            this.mx = null;
+            this.sentX = null;
+            this.liveSend('p', { i: this.me.id, h: 1 });
+          }
+        });
+        // hide while the tab is away; drop the connection after a minute of it
+        document.addEventListener('visibilitychange', () => {
+          if (document.hidden) {
+            this.liveSend('p', { i: this.me.id, h: 1 });
+            this._idleT = setTimeout(() => this.liveClose(), 60000);
+          } else {
+            clearTimeout(this._idleT);
+            if (!this.net) this.liveConnect();
+          }
+        });
+        setTimeout(() => this.liveConnect(), 1200);
+      }
+
+      liveConnect() {
+        if (this.net || this._connecting) return;
+        if (/[?&]tglocal/.test(location.search)) {
+          this.liveLocal();
+          return;
+        }
+        if (!LIVE.url || !LIVE.key) return;
+        const go = () => {
+          this._connecting = false;
+          if (!window.supabase || this.net) return;
+          try {
+            const sb = window.supabase.createClient(LIVE.url, LIVE.key, {
+              auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+              realtime: { params: { eventsPerSecond: 20 } }
+            });
+            const ch = sb.channel('garden', { config: { broadcast: { self: false, ack: false }, presence: { key: this.me.id } } });
+            const meta = () => {
+              const st = ch.presenceState();
+              const out = {};
+              for (const k in st) {
+                const v = st[k] && st[k][0];
+                out[k] = { n: v && v.n, c: v && v.c };
+              }
+              return out;
+            };
+            ch.on('broadcast', { event: 'p' }, ({ payload }) => this.livePeer(payload))
+              .on('presence', { event: 'sync' }, () => this.livePresence(meta()))
+              .subscribe(status => {
+                if (status === 'SUBSCRIBED') ch.track({ n: this.me.n, c: this.me.c });
+                else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') this.livePresence({});
+              });
+            this.net = {
+              send: (ev, payload) => ch.send({ type: 'broadcast', event: ev, payload }),
+              close: () => {
+                try {
+                  sb.removeChannel(ch);
+                } catch (err) {
+                  console.warn('Type Garden: closing the live channel failed', err);
+                }
+              }
+            };
+          } catch (err) {
+            console.warn('Type Garden: live garden unavailable', err);
+            this.net = null;
+          }
+        };
+        if (window.supabase) {
+          go();
+          return;
+        }
+        this._connecting = true;
+        const s = document.createElement('script');
+        s.src = SUPABASE_JS;
+        s.async = true;
+        s.onload = go;
+        s.onerror = () => {
+          this._connecting = false;
+          console.warn('Type Garden: could not load supabase-js, gardening alone');
+        };
+        document.head.appendChild(s);
+      }
+
+      // tabs in one browser talk over a BroadcastChannel (for testing, no project needed)
+      liveLocal() {
+        const bc = new BroadcastChannel('tg-live');
+        const roster = new Map();
+        const publish = () => {
+          const now = Date.now();
+          const out = {};
+          for (const [k, v] of roster) {
+            if (now - v.t > 3500) roster.delete(k);
+            else out[k] = { n: v.n, c: v.c };
+          }
+          this.livePresence(out);
+        };
+        const beat = () => {
+          roster.set(this.me.id, { n: this.me.n, c: this.me.c, t: Date.now() });
+          bc.postMessage({ k: 'hello', id: this.me.id, n: this.me.n, c: this.me.c });
+          publish();
+        };
+        bc.onmessage = ({ data: d }) => {
+          if (!d || typeof d !== 'object') return;
+          if (d.k === 'hello' && typeof d.id === 'string') {
+            const had = roster.has(d.id);
+            roster.set(d.id, { n: d.n, c: d.c, t: Date.now() });
+            if (!had) publish();
+          } else if (d.k === 'bye') {
+            roster.delete(d.id);
+            publish();
+          } else if (d.k === 'p') {
+            this.livePeer(d.payload);
+          }
+        };
+        beat();
+        this._beat = setInterval(beat, 1000);
+        this.net = {
+          send: (ev, payload) => bc.postMessage({ k: ev, payload }),
+          close: () => {
+            bc.postMessage({ k: 'bye', id: this.me.id });
+            clearInterval(this._beat);
+            bc.close();
+          }
+        };
+      }
+
+      liveClose() {
+        if (this.net) {
+          this.net.close();
+          this.net = null;
+        }
+        for (const id of [...this.peers.keys()]) this.peerDrop(id);
+        this.others = 0;
+        this.liveCount(1);
+      }
+
+      liveSend(ev, payload) {
+        if (!this.net || this.others < 1) return;
+        try {
+          this.net.send(ev, payload);
+        } catch (err) {
+          console.warn('Type Garden: live send failed', err);
+        }
+      }
+
+      // who is here: meta maps id → { n: flower name, c: tint }
+      livePresence(meta) {
+        this.roster = meta || {};
+        const n = new Set([...Object.keys(this.roster), this.me.id]).size;
+        this.others = n - 1;
+        for (const id of [...this.peers.keys()]) {
+          if (!this.roster[id]) this.peerDrop(id);
+        }
+        for (const [id, p] of this.peers) {
+          const r = this.roster[id];
+          if (r && (r.n !== p.n || r.c !== p.c)) this.peerStyle(p, r);
+        }
+        this.liveCount(n);
+      }
+
+      liveCount(n) {
+        this.el.count.textContent = n > 1 ? `${n} gardeners here` : '';
+      }
+
+      // a visitor's pointer, in fractions of the screen; h means hidden
+      livePeer(d) {
+        if (!d || typeof d.i !== 'string' || d.i === this.me.id) return;
+        let p = this.peers.get(d.i);
+        if (!p) {
+          if (this.peers.size >= 40) return;
+          p = this.peerMake(d.i);
+        }
+        p.t = performance.now();
+        p.h = !!d.h;
+        if (!d.h && typeof d.x === 'number' && typeof d.y === 'number') {
+          p.tx = Math.min(1.02, Math.max(-0.02, d.x));
+          p.ty = Math.min(1.02, Math.max(-0.02, d.y));
+          if (p.x == null) {
+            p.x = p.tx * this.W;
+            p.y = p.ty * this.H;
+          }
+        }
+      }
+
+      peerMake(id) {
+        const el = document.createElement('div');
+        el.className = 'tg-peer';
+        el.style.opacity = '0';
+        el.innerHTML = '<svg width="18" height="20" viewBox="0 0 18 20"><path d="M1 1L1 16L5.5 12L8.5 19L11.5 17.6L8.6 11H15Z" stroke="#000" stroke-width="1.2" stroke-linejoin="round"/></svg><span></span>';
+        this.el.peers.appendChild(el);
+        const p = { id, el, x: null, y: null, tx: 0, ty: 0, t: 0, h: true, op: 0 };
+        this.peers.set(id, p);
+        this.peerStyle(p, this.roster[id] || {});
+        return p;
+      }
+
+      // names and tints arrive from other people's browsers: keep them short, and the tint a plain hex colour
+      peerStyle(p, r) {
+        p.n = typeof r.n === 'string' && r.n ? r.n.slice(0, 24) : 'visitor';
+        p.c = /^#[0-9A-Fa-f]{6}$/.test(r.c || '') ? r.c : '#FFFFFF';
+        p.el.querySelector('path').setAttribute('fill', p.c);
+        const s = p.el.querySelector('span');
+        s.textContent = p.n;
+        s.style.background = p.c;
+      }
+
+      peerDrop(id) {
+        const p = this.peers.get(id);
+        if (p) {
+          p.el.remove();
+          this.peers.delete(id);
+        }
+      }
+
+      // send only when someone else is here and the pointer moved; the interval grows with the room
+      // (~40 messages a second room-wide). Visitors' cursors glide between updates and fade when idle.
+      liveStep(now, dt) {
+        const N = this.others + 1;
+        const iv = Math.min(10000, Math.max(125, (1000 * N * N) / 40));
+        if (this.net && this.others > 0 && this.mx != null && !document.hidden && now - this.lastSend >= iv) {
+          const x = Math.round((this.mx / this.W) * 1000) / 1000;
+          const y = Math.round((this.my / this.H) * 1000) / 1000;
+          if (x !== this.sentX || y !== this.sentY) {
+            this.lastSend = now;
+            this.sentX = x;
+            this.sentY = y;
+            this.liveSend('p', { i: this.me.id, x, y });
+          }
+        }
+        if (!this.peers.size) return;
+        const tau = Math.min(900, Math.max(70, 0.55 * iv));
+        const k = 1 - Math.exp(-dt / tau);
+        let shown = 0;
+        for (const p of [...this.peers.values()].sort((a, b) => b.t - a.t)) {
+          const idle = now - p.t;
+          const vis = !p.h && p.x != null && idle < 45000 && shown < 24;
+          if (vis) {
+            shown++;
+            p.x += (p.tx * this.W - p.x) * k;
+            p.y += (p.ty * this.H - p.y) * k;
+            p.el.style.transform = `translate(${p.x.toFixed(1)}px,${p.y.toFixed(1)}px)`;
+          }
+          const op = !vis ? 0 : idle < 8000 ? 1 : 0.35;
+          if (p.op !== op) {
+            p.op = op;
+            p.el.style.opacity = String(op);
+          }
+        }
+      }
+
       // ---------- butterflies ----------
       // a butterfly flies in from the nearer side and settles on the free rose closest to the click;
       // with no rose open it wanders about the click for a few seconds, then leaves
@@ -1887,6 +2249,7 @@
           }
         }
         this.letters = this.letters.filter(l => !(l.dead && now - l.dead > 300));
+        this.liveStep(now, dt);
         this.paint(now, true);
       }
 
@@ -1923,9 +2286,22 @@
         return { letters: this.letters, S: this.Sd, C: this.pal().C, boil: this.props.boil, recoil: this.props.recoil, speed: 1, wither: 260, face: true };
       }
 
-      // the pointer the garden leans toward, if any
-      near() {
-        return this.mx != null ? [this.mx, this.my] : null;
+      // the pointer nearest (x, y): yours, or any visitor's who moved recently; roses and letters lean to it
+      near(x, y) {
+        let best = this.mx != null ? [this.mx, this.my] : null;
+        let bd = best ? Math.hypot(best[0] - x, best[1] - y) : 1e9;
+        if (this.peers.size) {
+          const now = performance.now();
+          for (const p of this.peers.values()) {
+            if (p.h || p.x == null || now - p.t > 8000) continue;
+            const d = Math.hypot(p.x - x, p.y - y);
+            if (d < bd) {
+              bd = d;
+              best = [p.x, p.y];
+            }
+          }
+        }
+        return best;
       }
 
       // a rose turns its face toward the pointer, eased per rose
