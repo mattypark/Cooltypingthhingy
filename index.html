@@ -28,6 +28,14 @@
       display: none !important;
     }
 
+    a {
+      color: #FFFFFF;
+    }
+
+    a:hover {
+      color: #FFB4A8;
+    }
+
     .tg-app {
       position: fixed;
       inset: 0;
@@ -77,6 +85,37 @@
       top: var(--tg-top, 0px);
       bottom: auto;
       height: var(--tg-h, 100%);
+    }
+
+    /* ---------- mode switch ---------- */
+    .tg-modes {
+      position: absolute;
+      top: calc(16px + env(safe-area-inset-top));
+      right: calc(16px + env(safe-area-inset-right));
+      z-index: 5;
+      display: flex;
+      gap: 4px;
+      padding: 4px;
+      border: 1px solid #2A2A2A;
+      border-radius: 999px;
+      background: #000;
+    }
+
+    .tg-mode {
+      border: 0;
+      border-radius: 999px;
+      padding: 7px 14px;
+      font: inherit;
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      background: transparent;
+      color: #BDBDBD;
+    }
+
+    .tg-mode[aria-pressed="true"] {
+      background: #FFFFFF;
+      color: #000000;
     }
 
     /* ---------- bottom bar ---------- */
@@ -207,12 +246,261 @@
         padding: 7px 11px;
       }
     }
+
+    /* ---------- poster ---------- */
+    .tg-poster {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+      background: #000;
+      cursor: default;
+      color: #EDEDED;
+      font-size: 12px;
+      letter-spacing: 0.03em;
+    }
+
+    .tg-panel {
+      border-right: 1px solid #1E1E1E;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 24px 22px 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 26px;
+      background: #0A0A0A;
+    }
+
+    .tg-head {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .tg-title {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-weight: 700;
+      font-size: 26px;
+      color: #FFFFFF;
+    }
+
+    .tg-muted {
+      color: #8C8C8C;
+    }
+
+    .tg-section {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .tg-label {
+      color: #8C8C8C;
+      text-transform: uppercase;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+    }
+
+    .tg-words {
+      background: #000;
+      border: 1px solid #2A2A2A;
+      border-radius: 10px;
+      color: #FFFFFF;
+      font-family: 'Playfair Display', Georgia, serif;
+      font-weight: 700;
+      font-size: 22px;
+      padding: 10px 12px;
+      outline: none;
+    }
+
+    .tg-words:focus {
+      border-color: #FFFFFF;
+    }
+
+    .tg-ghost {
+      align-self: flex-start;
+      background: transparent;
+      border: 1px solid #2A2A2A;
+      color: #EDEDED;
+      font: inherit;
+      padding: 8px 12px;
+      border-radius: 999px;
+      cursor: pointer;
+    }
+
+    .tg-ghost:hover {
+      border-color: #FFFFFF;
+    }
+
+    .tg-presets {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .tg-preset {
+      text-align: left;
+      background: transparent;
+      border: 1px solid #2A2A2A;
+      color: #FFFFFF;
+      font: inherit;
+      padding: 10px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .tg-preset[aria-pressed="true"] {
+      background: #161616;
+      border-color: #FFFFFF;
+    }
+
+    .tg-preset-name {
+      font-size: 13px;
+    }
+
+    .tg-preset-sub {
+      color: #8C8C8C;
+      font-size: 11px;
+    }
+
+    .tg-cards {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .tg-card {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: stretch;
+      background: transparent;
+      border: 1px solid #2A2A2A;
+      color: #EDEDED;
+      font: inherit;
+      padding: 6px 6px 8px;
+      border-radius: 12px;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .tg-card:hover {
+      border-color: #8C8C8C;
+    }
+
+    .tg-card[aria-pressed="true"] {
+      border-color: #FFFFFF;
+    }
+
+    .tg-card-swatch {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 44px;
+      border-radius: 8px;
+    }
+
+    .tg-card-flower {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+    }
+
+    .tg-card-stem {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      margin-left: -4px;
+    }
+
+    .tg-card-type {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-weight: 700;
+      font-size: 18px;
+      margin-left: 8px;
+    }
+
+    .tg-card-name {
+      padding: 0 4px;
+    }
+
+    .tg-credit {
+      margin-top: auto;
+      color: #8C8C8C;
+    }
+
+    .tg-stage {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 56px 32px 32px;
+      min-width: 0;
+    }
+
+    .tg-pcanvas {
+      width: min(100%, calc(100vh - 96px));
+      height: auto;
+      aspect-ratio: 1 / 1;
+      display: block;
+      border: 1px solid #1E1E1E;
+    }
+
+    /* narrow screens: the poster on top, the panel scrolling under it */
+    @media (max-width: 720px) {
+      .tg-poster {
+        display: flex;
+        flex-direction: column;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        touch-action: pan-y;
+      }
+
+      .tg-poster::before {
+        content: "";
+        order: -2;
+        position: sticky;
+        top: 0;
+        flex: none;
+        height: calc(60px + env(safe-area-inset-top));
+        margin-bottom: calc(-60px - env(safe-area-inset-top));
+        background: linear-gradient(#000 62%, rgba(0, 0, 0, 0));
+        z-index: 4;
+        pointer-events: none;
+      }
+
+      .tg-stage {
+        order: -1;
+        flex: none;
+        padding: calc(64px + env(safe-area-inset-top)) 16px 12px;
+      }
+
+      .tg-pcanvas {
+        width: 100%;
+        max-width: 520px;
+      }
+
+      .tg-panel {
+        flex: none;
+        border-right: 0;
+        border-top: 1px solid #1E1E1E;
+        overflow: visible;
+        padding: 20px 16px calc(32px + env(safe-area-inset-bottom));
+      }
+    }
   </style>
 </head>
 <body>
   <div class="tg-app">
     <canvas class="tg-canvas"></canvas>
     <input class="tg-input" aria-label="Type to grow a garden" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false">
+
+    <div class="tg-modes" role="group" aria-label="Mode">
+      <button class="tg-mode" type="button" data-mode="type">Type</button>
+      <button class="tg-mode" type="button" data-mode="poster">Poster</button>
+    </div>
 
     <div class="tg-bar">
       <div class="tg-hints">
@@ -225,6 +513,40 @@
         <div class="tg-pal" role="group" aria-label="Palette"></div>
         <button class="tg-btn tg-png" type="button" title="Save PNG (⌘S)">PNG</button>
         <button class="tg-btn tg-svg" type="button" title="Save SVG (⇧⌘S)">SVG</button>
+      </div>
+    </div>
+
+    <div class="tg-poster" hidden>
+      <div class="tg-panel">
+        <div class="tg-head">
+          <div class="tg-title">Poster</div>
+          <div class="tg-muted tg-info"></div>
+        </div>
+
+        <div class="tg-section">
+          <div class="tg-label">Words</div>
+          <input class="tg-words" spellcheck="false" aria-label="Poster words">
+          <button class="tg-ghost tg-regrow" type="button">Regrow garden</button>
+        </div>
+
+        <div class="tg-section">
+          <div class="tg-label">Motion</div>
+          <div class="tg-presets"></div>
+        </div>
+
+        <div class="tg-section">
+          <div class="tg-label">Palette</div>
+          <div class="tg-cards"></div>
+        </div>
+
+        <div class="tg-credit">
+          After <a href="https://type-garden.vercel.app/" target="_blank" rel="noopener">Type Garden</a>
+          by <a href="https://x.com/art_akshat" target="_blank" rel="noopener">Akshat Agarwal</a>
+        </div>
+      </div>
+
+      <div class="tg-stage">
+        <canvas class="tg-pcanvas" width="1080" height="1080"></canvas>
       </div>
     </div>
   </div>
@@ -245,6 +567,13 @@
       showHint: true // the bottom bar in the typing view
     };
 
+    // poster loops; T is the loop length in ms
+    const PRESETS = [
+      { id: 'breathe', label: 'Breathe', sub: 'Slow sway · 3s', T: 3000 },
+      { id: 'grow', label: 'Grow & wither', sub: 'Bloom, then back · 6s', T: 6000 },
+      { id: 'typed', label: 'Typed', sub: 'Type, cut, repeat · 5s', T: 5000 }
+    ];
+
     // name, background, flower, stem & leaf, flower line, type
     const PALETTES = [
       ['Rose noir', '#000000', '#FF1400', '#3257FF', '#FFB4A8', '#FFFFFF'],
@@ -261,14 +590,23 @@
 
     class TypeGarden {
       constructor() {
-        this.state = { mode: 'type', palette: 0 };
+        this.state = { mode: 'type', preset: 'breathe', palette: 0, text: 'in bloom', seed: 7 };
         this.props = SETTINGS;
+        const $ = s => document.querySelector(s);
         this.el = {
-          app: document.querySelector('.tg-app'),
-          canvas: document.querySelector('.tg-canvas'),
-          input: document.querySelector('.tg-input'),
-          bar: document.querySelector('.tg-bar'),
-          pal: document.querySelector('.tg-pal')
+          app: $('.tg-app'),
+          canvas: $('.tg-canvas'),
+          input: $('.tg-input'),
+          modes: $('.tg-modes'),
+          bar: $('.tg-bar'),
+          pal: $('.tg-pal'),
+          poster: $('.tg-poster'),
+          pcanvas: $('.tg-pcanvas'),
+          info: $('.tg-info'),
+          words: $('.tg-words'),
+          regrow: $('.tg-regrow'),
+          presets: $('.tg-presets'),
+          cards: $('.tg-cards')
         };
         this.mount();
       }
@@ -277,6 +615,11 @@
         this.state = { ...this.state, ...patch };
         this.renderUI();
         if (cb) cb();
+      }
+
+      // a change that also regrows the poster
+      upd(patch) {
+        this.setState(patch, () => this.buildPoster());
       }
 
       mount() {
@@ -353,10 +696,12 @@
             .then(() => {
               this.cache = {};
               this.layout();
+              this.buildPoster();
             })
             .catch(err => console.warn('Type Garden: font did not load', err));
         }
 
+        this.buildPoster();
         const loop = () => {
           this.raf = requestAnimationFrame(loop);
           this.frame();
@@ -369,7 +714,46 @@
 
       // ---------- interface ----------
       buildUI() {
-        this.ui = { swatches: [] };
+        this.ui = { swatches: [], presets: [], cards: [] };
+        this.ui.modes = [...this.el.modes.querySelectorAll('.tg-mode')];
+        this.ui.modes.forEach(b => b.addEventListener('click', () => this.pickMode(b.dataset.mode)));
+
+        PRESETS.forEach(p => {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'tg-preset';
+          b.innerHTML = '<span class="tg-preset-name"></span><span class="tg-preset-sub"></span>';
+          b.children[0].textContent = p.label;
+          b.children[1].textContent = p.sub;
+          b.addEventListener('click', () => this.upd({ preset: p.id }));
+          this.el.presets.appendChild(b);
+          this.ui.presets.push(b);
+        });
+
+        PALETTES.forEach(([name, bg, flower, stem, , text], i) => {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'tg-card';
+          b.setAttribute('aria-label', name);
+          b.innerHTML = [
+            '<span class="tg-card-swatch">',
+            '<span class="tg-card-flower"></span><span class="tg-card-stem"></span><span class="tg-card-type">Aa</span>',
+            '</span>',
+            '<span class="tg-card-name"></span>'
+          ].join('');
+          b.querySelector('.tg-card-swatch').style.background = bg;
+          b.querySelector('.tg-card-flower').style.background = flower;
+          b.querySelector('.tg-card-stem').style.background = stem;
+          b.querySelector('.tg-card-type').style.color = text;
+          b.querySelector('.tg-card-name').textContent = name;
+          b.addEventListener('click', e => this.pickPalette(i, e));
+          this.el.cards.appendChild(b);
+          this.ui.cards.push(b);
+        });
+
+        this.el.words.addEventListener('input', e => this.upd({ text: e.target.value }));
+        this.el.regrow.addEventListener('click', () => this.upd({ seed: Math.floor(Math.random() * 1e6) }));
+
         PALETTES.forEach(([name, bg, flower], i) => {
           const b = document.createElement('button');
           b.type = 'button';
@@ -395,6 +779,23 @@
         });
       }
 
+      // the poster starts from whatever is typed
+      pickMode(id) {
+        const s = this.state;
+        if (id === 'poster' && s.mode !== 'poster') {
+          this.upd({ mode: 'poster', text: this.liveText() || s.text });
+        } else if (id === 'type') {
+          this.setState({ mode: 'type' }, () => {
+            this.resize();
+            this.el.input.focus({ preventScroll: true });
+          });
+        }
+      }
+
+      liveText() {
+        return this.letters.filter(l => !l.dead).map(l => l.ch).join('').trim();
+      }
+
       pickPalette(i, e) {
         e.stopPropagation();
         this.setState({ palette: i }, () => this.refocus());
@@ -409,7 +810,10 @@
         const s = this.state;
         const isType = s.mode === 'type';
         const pc = this.pal();
+        const pr = this.preset();
         this.el.app.style.background = pc.bg;
+        this.el.canvas.style.display = isType ? 'block' : 'none';
+        this.ui.modes.forEach(b => b.setAttribute('aria-pressed', String(s.mode === b.dataset.mode)));
         this.el.bar.hidden = !(isType && this.props.showHint);
         this.el.bar.style.color = pc.C.text;
         this.el.pal.style.background = pc.bg;
@@ -420,6 +824,11 @@
           b.style.setProperty('--scale', on ? 1.1 : 1);
           b.setAttribute('aria-pressed', String(on));
         });
+        this.el.poster.hidden = isType;
+        this.el.info.textContent = `1:1 · ${pr.T / 1000}s loop · 30 fps`;
+        if (this.el.words.value !== s.text) this.el.words.value = s.text;
+        this.ui.presets.forEach((b, i) => b.setAttribute('aria-pressed', String(s.preset === PRESETS[i].id)));
+        this.ui.cards.forEach((b, i) => b.setAttribute('aria-pressed', String(s.palette === i)));
       }
 
       // ---------- math ----------
@@ -1395,6 +1804,10 @@
         const now = performance.now();
         const dt = Math.min(64, now - (this.lt || now));
         this.lt = now;
+        if (this.state.mode === 'poster') {
+          this.posterDraw(this.el.pcanvas.getContext('2d'), now - (this.pt0 || 0));
+          return;
+        }
         // everything glides to its new place with the same time constant
         const k = 1 - Math.exp(-dt / 80);
         this.Sd += (this.St - this.Sd) * k;
@@ -1440,7 +1853,7 @@
       }
 
       mainState() {
-        return { letters: this.letters, S: this.Sd, C: this.pal().C, boil: this.props.boil, recoil: this.props.recoil, wither: 260, face: true };
+        return { letters: this.letters, S: this.Sd, C: this.pal().C, boil: this.props.boil, recoil: this.props.recoil, speed: 1, wither: 260, face: true };
       }
 
       // the pointer the garden leans toward, if any
@@ -1472,11 +1885,13 @@
         return c;
       }
 
-      // garden behind the type, the type, then the garden in front of it
+      // garden behind the type, the type, then the garden in front of it. Shared by the typing view, the
+      // poster and the SVG export; st carries what differs (size, palette, speed, warps)
       render(B, now, st) {
         const S = st.S;
         const L = st.letters;
         const act = L.filter(l => !l.dead);
+        const sp = st.speed || 1;
         this.cc = st.C;
         this._now = now;
         if (st.face) this.perch = [];
@@ -1510,7 +1925,7 @@
         const draw = layer => {
           for (const l of L) {
             if (l.ch === ' ' || !l.els) continue;
-            const age = now - l.birth;
+            const age = (now - l.birth) * sp;
             const kk = kd(l);
             const each = e => {
               if (e.t === 'stem') this.drawStem(B, e, l, age, kk, st, f, amp, layer);
@@ -1522,24 +1937,24 @@
             const i = act.indexOf(l);
             const nx = i >= 0 ? act[i + 1] : null;
             if (l.tend && (l.dead || !nx || nx.ch === ' ')) {
-              let fr = this.eo((now - l.tb - 150) / 450);
-              if (l.cut != null) fr *= 1 - this.eo((now - l.cut) / 150) * Math.min(0.85, st.recoil / (0.6 * S));
+              let fr = this.eo(((now - l.tb) * sp - 150) / 450);
+              if (l.cut != null) fr *= 1 - this.eo((now - l.cut) * sp / 150) * Math.min(0.85, st.recoil / (0.6 * S));
               for (const e of l.tend) this.drawStem(B, e, l, age, kk, st, f, amp, layer, fr * kk);
             }
           }
         };
         draw(0);
         for (const l of L) {
-          if (l.ch !== ' ' && !l.dead) B.text(l.ch, l.x, l.y, st.S, st.C.text);
+          if (l.ch !== ' ' && (st.textAll || !l.dead)) B.text(l.ch, l.x, l.y, S, st.C.text);
         }
         draw(1);
       }
 
-      // where a garden point sits right now: a new letter's garden wobbles in and settles, and the whole
-      // garden leans toward the pointer; higher points move more
+      // where a garden point sits right now: a new letter's garden wobbles in and settles, the whole
+      // garden leans toward the pointer (higher points move more), then any poster warp applies
       wpt(st, l, x, y) {
         if (l.birth != null && this._now != null) {
-          const t = (this._now - l.birth) / 1000;
+          const t = (this._now - l.birth) * (st.speed || 1) / 1000;
           if (t > 0 && t < 2.5) {
             const hh = Math.max(0, (l.y - y) / st.S);
             const dmp = Math.exp(-t * 3.2);
@@ -1554,7 +1969,7 @@
           x += l.lean[0] * st.S * 0.1 * f;
           y += l.lean[1] * st.S * 0.05 * f;
         }
-        return [x, y];
+        return st.warp ? st.warp(x, y, l) : [x, y];
       }
 
       // frO overrides how much of the stem is grown (0..1)
@@ -1579,11 +1994,12 @@
         const S = st.S;
         const j = this.jit(e.id, f, amp);
         const wx = (x, y) => this.wpt(st, l, l.x + x * S + j[0], l.y + y * S + j[1]);
+        const rw = st.rotw ? st.rotw(e) : 0;
         if (e.t === 'leaf') {
           const sc = this.spr((age - e.d0) / 1000, 7, 15) * kk;
           if (sc <= 0) return;
           const p = wx(e.x, e.y);
-          this.leaf(B, p[0], p[1], e.a + j[2], e.L * S * sc, e.bend);
+          this.leaf(B, p[0], p[1], e.a + j[2] + rw, e.L * S * sc, e.bend);
         } else if (e.t === 'rose') {
           const a = age - e.d0;
           if (a < 0 || kk <= 0.001) return;
@@ -1591,7 +2007,180 @@
           const tl = st.face ? this.faceTurn(e, p[0], p[1]) : null;
           // an open rose on a living letter is somewhere a butterfly can land
           if ((st.face || st.perchOn) && !l.dead && a > 700) this.perch.push({ id: e.id, x: p[0], y: p[1], R: e.R * S * kk });
-          this.rose(B, p[0], p[1], e.R * S * kk, e.rot + j[2] + (tl ? tl[0] * 0.22 : 0), e, a, tl);
+          this.rose(B, p[0], p[1], e.R * S * kk, e.rot + j[2] + rw + (tl ? tl[0] * 0.22 : 0), e, a, tl);
+        }
+      }
+
+      // ---------- poster ----------
+      preset() {
+        return PRESETS.find(p => p.id === this.state.preset) || PRESETS[0];
+      }
+
+      // grow the poster's words once from the seed, time each letter for the preset, then fit the whole
+      // garden into a 1080 square
+      buildPoster() {
+        if (!this.g) return;
+        const s = this.state;
+        const pr = this.preset();
+        const text = (s.text || '').slice(0, 40) || ' ';
+        this.rand = this.rng(s.seed * 7919 + 1);
+        const L = [];
+        let prev = null;
+        let uid = 1;
+        for (const ch of text) {
+          if (ch === ' ') {
+            const sp = { ch: ' ', id: 9000 + uid++, els: [] };
+            L.push(sp);
+            prev = sp;
+            continue;
+          }
+          const same = prev && prev.ch !== ' ';
+          const l = {
+            ch,
+            id: 9000 + uid++,
+            ws: same ? prev.ws : Math.floor(this.rand() * 1e9),
+            wi: same ? prev.wi + 1 : 0,
+            prev: same ? prev : null
+          };
+          this.gen(l);
+          L.push(l);
+          prev = l;
+        }
+
+        // b: when each letter is born; d: when it withers (last letter first)
+        const n = L.length;
+        const step = pr.id === 'grow' ? Math.min(110, 3000 / n) : pr.id === 'typed' ? Math.min(85, 3600 / n) : 0;
+        const off = pr.id === 'grow' ? 200 : pr.id === 'typed' ? 300 : 0;
+        L.forEach((l, i) => {
+          l.b = off + i * step;
+        });
+        const wd = Math.min(60, 900 / n);
+        L.forEach((l, i) => {
+          l.d = 4200 + (n - 1 - i) * wd;
+          const nx = L[i + 1];
+          l.cutRel = null;
+          if (l.ch !== ' ' && nx && nx.ch === ' ') {
+            l.cutRel = Math.max(30, nx.b - l.b);
+            this.genEnd(l, l.cutRel);
+          }
+        });
+        this.rand = Math.random;
+        const res = this.layoutCore(L, 1080, 1080, false);
+
+        // bounds of the whole garden, not just the type
+        const S = res.S;
+        let x0 = 1e9;
+        let y0 = 1e9;
+        let x1 = -1e9;
+        let y1 = -1e9;
+        const addP = (l, x, y, r) => {
+          const X = l.tx + x * S;
+          const Y = l.ty + y * S;
+          const R = (r || 0) * S;
+          x0 = Math.min(x0, X - R);
+          x1 = Math.max(x1, X + R);
+          y0 = Math.min(y0, Y - R);
+          y1 = Math.max(y1, Y + R);
+        };
+        for (const l of L) {
+          if (l.ch === ' ') continue;
+          addP(l, -l.tw / S / 2, -0.75);
+          addP(l, l.tw / S / 2, 0.1);
+          for (const e of [...l.els, ...(l.endEls || [])]) {
+            if (e.t === 'stem') e.pts.forEach(q => addP(l, q[0], q[1], 0.02));
+            else if (e.t === 'leaf') addP(l, e.x, e.y, e.L);
+            else addP(l, e.x, e.y, e.R * 1.15);
+          }
+        }
+
+        // centre on the type itself; shrink just enough for the garden to clear a 6% margin on every side
+        let tx0 = 1e9;
+        let tx1 = -1e9;
+        let ty0 = 1e9;
+        let ty1 = -1e9;
+        for (const l of L) {
+          if (l.ch === ' ') continue;
+          tx0 = Math.min(tx0, l.tx - l.tw / 2);
+          tx1 = Math.max(tx1, l.tx + l.tw / 2);
+          ty0 = Math.min(ty0, l.ty - 0.72 * S);
+          ty1 = Math.max(ty1, l.ty);
+        }
+        const Z = 1080;
+        const half = Z * 0.44;
+        const bcx = (tx0 + tx1) / 2;
+        const bcy = (ty0 + ty1) / 2;
+        const k = Math.min(1.25, half / Math.max(1, bcx - x0, x1 - bcx), half / Math.max(1, bcy - y0, y1 - bcy));
+        L.forEach(l => {
+          l.tx = Z / 2 + (l.tx - bcx) * k;
+          l.ty = Z / 2 + (l.ty - bcy) * k;
+          l.tw *= k;
+          l.x = l.tx;
+          l.y = l.ty;
+        });
+        this.P = { letters: L, S: S * k, T: pr.T, preset: pr.id };
+        this.pt0 = performance.now();
+      }
+
+      // one frame of the poster loop, t ms in
+      posterDraw(g, t) {
+        const P = this.P;
+        if (!P) return;
+        const Z = 1080;
+        const pc = this.pal();
+        g.setTransform(1, 0, 0, 1, 0, 0);
+        g.fillStyle = pc.bg;
+        g.fillRect(0, 0, Z, Z);
+        const tt = ((t % P.T) + P.T) % P.T;
+        const L = P.letters;
+        const B = this.backend(g);
+        const st = { letters: L, S: P.S, C: pc.C, boil: this.props.boil, recoil: this.props.recoil, speed: 1, wither: 600, textAll: true };
+        L.forEach(l => {
+          l.x = l.tx;
+          l.y = l.ty;
+          l.dead = null;
+        });
+        // replay each letter's birth (and cut) from a base time; -1e5 means long since grown
+        const set = base => L.forEach(l => {
+          l.birth = base + l.b;
+          l.tb = l.birth;
+          l.cut = l.cutRel != null ? l.birth + l.cutRel : null;
+        });
+
+        if (P.preset === 'breathe') {
+          set(-1e5);
+          const ph = tt / P.T * Math.PI * 2;
+          const S = P.S;
+          st.warp = (x, y, l) => {
+            const h = Math.max(0, (l.y - y) / S);
+            return [x + Math.sin(ph + l.x * 0.004 + h * 1.1) * S * 0.03 * h, y + Math.cos(ph + x * 0.003) * S * 0.008 * h];
+          };
+          st.rotw = e => Math.sin(ph + e.id * 0.7) * 0.12;
+        } else if (P.preset === 'grow') {
+          set(0);
+          L.forEach(l => {
+            if (tt >= l.d) l.dead = l.d;
+          });
+        } else {
+          // typed: letters arrive one by one, then the loop rests empty
+          if (tt >= 4400) return;
+          set(0);
+          st.letters = L.filter(l => tt >= l.birth);
+          st.textAll = false;
+        }
+
+        this.render(B, tt, st);
+
+        if (P.preset === 'typed') {
+          const born = st.letters;
+          const last = born[born.length - 1];
+          const S = P.S;
+          if (Math.floor(tt / 400) % 2 === 0 || (last && tt - last.birth < 300)) {
+            const x = last ? last.tx + last.tw / 2 + 0.07 * S : 540;
+            const y = last ? last.ty - 0.33 * S : 540;
+            const w = Math.max(2, S * 0.03);
+            const h = 0.8 * S;
+            B.rect(x - w / 2, y - h / 2, w, h, st.C.text);
+          }
         }
       }
 
