@@ -150,6 +150,12 @@
         return 1 - Math.pow(1 - t, 3);
       }
 
+      // damped spring from 0 to 1, with overshoot
+      spr(t, k = 7, w = 16) {
+        if (t <= 0) return 0;
+        return 1 - Math.exp(-t * k) * Math.cos(t * w);
+      }
+
       // seeded generator (mulberry32), so a word's garden can be replayed
       rng(seed) {
         let s = seed | 0;
@@ -697,6 +703,38 @@
         B.stroke([p, [p[0] + Math.cos(d) * L, p[1] + Math.sin(d) * L]], this.cc.blue, S * 0.022);
       }
 
+      // a leaf of length L from (bx, by) at angle a, its midrib bowed by bend, with a vein once it is big enough
+      leaf(B, bx, by, a, L, bend) {
+        if (L < 0.5) return;
+        const ca = Math.cos(a);
+        const sa = Math.sin(a);
+        const px = -sa;
+        const py = ca;
+        const ax = u => {
+          const b = Math.sin(Math.PI * u) * bend * 0.15 * L;
+          return [bx + ca * u * L + px * b, by + sa * u * L + py * b];
+        };
+        const hw = u => L * 0.18 * Math.sin(Math.PI * Math.pow(u, 0.8));
+        const N = 12;
+        const s1 = [];
+        const s2 = [];
+        for (let i = 0; i <= N; i++) {
+          const u = i / N;
+          const c = ax(u);
+          const w = hw(u);
+          s1.push([c[0] + px * w, c[1] + py * w]);
+          s2.push([c[0] - px * w, c[1] - py * w]);
+        }
+        const tip = ax(1);
+        const base = ax(0);
+        B.fill([base, ...s1.slice(1, N), tip, tip, ...s2.slice(1, N).reverse(), base], this.cc.blue);
+        if (L > 6) {
+          const v = [];
+          for (let i = 0; i <= 8; i++) v.push(ax(0.08 + 0.72 * i / 8));
+          B.stroke(v, this.cc.vein, Math.max(0.8, L * 0.03));
+        }
+      }
+
       // ---------- render ----------
       frame() {
         const now = performance.now();
@@ -760,6 +798,7 @@
             const kk = kd(l);
             for (const e of l.els) {
               if (e.t === 'stem') this.drawStem(B, e, l, age, kk, st, layer);
+              else if (e.layer === layer) this.drawEl(B, e, l, age, kk, st);
             }
           }
         };
@@ -783,6 +822,17 @@
         }
         for (const th of e.thorns) {
           if (fr > th.u && this.layerAt(e.segs, th.u) === layer) this.thorn(B, P, th.u, th.s, S);
+        }
+      }
+
+      drawEl(B, e, l, age, kk, st) {
+        const S = st.S;
+        const wx = (x, y) => [l.x + x * S, l.y + y * S];
+        if (e.t === 'leaf') {
+          const sc = this.spr((age - e.d0) / 1000, 7, 15) * kk;
+          if (sc <= 0) return;
+          const p = wx(e.x, e.y);
+          this.leaf(B, p[0], p[1], e.a, e.L * S * sc, e.bend);
         }
       }
     }
