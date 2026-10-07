@@ -71,6 +71,14 @@
       touch-action: manipulation;
     }
 
+    /* phones: fit the app to the area the keyboard leaves visible */
+    html[data-touch] .tg-app {
+      touch-action: none;
+      top: var(--tg-top, 0px);
+      bottom: auto;
+      height: var(--tg-h, 100%);
+    }
+
     /* ---------- bottom bar ---------- */
     .tg-bar {
       position: absolute;
@@ -225,6 +233,8 @@
     'use strict';
 
     const FONT = '"Playfair Display", Georgia, serif';
+    // kept in the hidden field so Backspace on an empty field still reports
+    const SENT = '​';
     // the SVG export pulls the face in itself, so the file renders right on its own in a browser
     const SVG_FONT_CSS = 'https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700';
 
@@ -299,6 +309,44 @@
           this.mx = null;
         });
 
+        // ---------- phone ----------
+        this.touch = !!(window.matchMedia && matchMedia('(pointer: coarse)').matches);
+        if (this.touch) document.documentElement.setAttribute('data-touch', '');
+        this.ptype = 'mouse';
+        window.addEventListener('pointerdown', e => {
+          this.ptype = e.pointerType || 'mouse';
+        }, true);
+        // roses relax when the finger lifts
+        const onUp = e => {
+          if (e.pointerType && e.pointerType !== 'mouse') this.mx = null;
+        };
+        window.addEventListener('pointerup', onUp);
+        window.addEventListener('pointercancel', onUp);
+        this.el.app.addEventListener('click', ev => this.tapFocus(ev));
+
+        const fld = this.el.input;
+        this.iv = SENT;
+        fld.value = SENT;
+        fld.addEventListener('input', e => this.inputDiff(e.target));
+        fld.addEventListener('compositionstart', () => {
+          this.composing = true;
+        });
+        fld.addEventListener('compositionend', () => {
+          this.composing = false;
+          setTimeout(() => {
+            if (!this.composing) this.inputDiff(fld);
+          }, 0);
+        });
+
+        this.vv = window.visualViewport || null;
+        this.vvMax = 0;
+        if (this.vv && this.touch) {
+          this.vv.addEventListener('resize', () => this.syncVV());
+          this.vv.addEventListener('scroll', () => this.syncVV());
+          this.syncVV();
+        }
+        if (/[?&]tgtest/.test(location.search)) window.__tg = this;
+
         // widths were measured with the fallback face until the web font arrives
         if (document.fonts) {
           document.fonts.load(`700 100px ${FONT}`)
@@ -314,7 +362,8 @@
           this.frame();
         };
         loop();
-        setTimeout(() => this.el.input.focus({ preventScroll: true }), 50);
+        // phones wait for a tap, so the keyboard doesn't jump up on load
+        if (!this.touch) setTimeout(() => this.el.input.focus({ preventScroll: true }), 50);
         this.renderUI();
       }
 
@@ -351,9 +400,9 @@
         this.setState({ palette: i }, () => this.refocus());
       }
 
-      // after a bar button, typing carries on
+      // after a bar button, typing carries on (on phones that would pop the keyboard, so not there)
       refocus() {
-        if (this.state.mode === 'type') this.el.input.focus({ preventScroll: true });
+        if (this.ptype === 'mouse' && this.state.mode === 'type') this.el.input.focus({ preventScroll: true });
       }
 
       renderUI() {
@@ -695,9 +744,75 @@
       // pointer down anywhere keeps the field focused; on the garden it also calls a butterfly
       focus(ev) {
         if (this.state.mode !== 'type') return;
+        const touch = ev.pointerType && ev.pointerType !== 'mouse';
         const onCanvas = ev.target === this.el.canvas;
-        this.el.input.focus({ preventScroll: true });
+        if (touch) {
+          // leave focus (and the keyboard) where it is while tapping; the tap's click opens the keyboard
+          if (ev.cancelable && (onCanvas || (ev.target.closest && ev.target.closest('button')))) ev.preventDefault();
+        } else {
+          this.el.input.focus({ preventScroll: true });
+        }
         if (onCanvas) this.spawnFly(ev.clientX, ev.clientY);
+      }
+
+      tapFocus(ev) {
+        if (this.state.mode === 'type' && this.ptype !== 'mouse' && ev.target === this.el.canvas) {
+          this.el.input.focus({ preventScroll: true });
+        }
+      }
+
+      // phone keyboards often skip real key events and write into the field instead, rewriting whole words
+      // while they predict: mirror the field and apply the difference, new letters grow and removed ones wither
+      inputDiff(el) {
+        if (this.state.mode !== 'type' || this._kd) {
+          this.iv = this.composing ? el.value : SENT;
+          if (!this.composing) el.value = SENT;
+          return;
+        }
+        const old = this.iv == null ? SENT : this.iv;
+        const cur = el.value;
+        let p = 0;
+        while (p < old.length && p < cur.length && old[p] === cur[p]) p++;
+        let dels = old.length - p;
+        // the sentinel is not a letter
+        if (p === 0 && old[0] === SENT && old.length > 1) dels -= 1;
+        const now = performance.now();
+        this.lastKey = now;
+        for (let i = 0; i < dels; i++) this.wither(now);
+        for (const ch of cur.slice(p)) {
+          if (ch === SENT) continue;
+          if (ch.charCodeAt(0) === 10) this.clear();
+          else this.add(ch, now);
+        }
+        if (this.composing) {
+          this.iv = cur;
+        } else {
+          el.value = SENT;
+          this.iv = SENT;
+        }
+      }
+
+      // keep the app inside the visible area as the keyboard comes and goes
+      syncVV() {
+        const vv = this.vv;
+        if (!vv) return;
+        const w = Math.round(vv.width);
+        if (this.vvW !== w) {
+          // rotated: measure again
+          this.vvW = w;
+          this.vvMax = 0;
+        }
+        this.vvMax = Math.max(this.vvMax, vv.height);
+        const kb = this.vvMax - vv.height > 120;
+        const de = document.documentElement;
+        de.style.setProperty('--tg-top', vv.offsetTop + 'px');
+        de.style.setProperty('--tg-h', vv.height + 'px');
+        if (kb) de.setAttribute('data-kb', '');
+        else de.removeAttribute('data-kb');
+        // keyboard put away while the field kept focus (Android back gesture): let go, so the next tap brings it back
+        if (!kb && this.kbWas && document.activeElement === this.el.input) this.el.input.blur();
+        this.kbWas = kb;
+        this.resize();
       }
 
       key(e) {
@@ -730,8 +845,13 @@
         this.add(e.key, now);
       }
 
+      // a real key event arrived; the field's own input event for the same key is ignored
       mark() {
         this.lastKey = performance.now();
+        this._kd = true;
+        setTimeout(() => {
+          this._kd = false;
+        }, 0);
       }
 
       add(ch, now) {
