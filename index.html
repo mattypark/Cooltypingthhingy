@@ -104,13 +104,29 @@
       }
 
       mount() {
+        this.letters = [];
+        this.uid = 1;
+        this.cache = {};
         this.Sd = 0;
+        this.St = 0;
+        this.wrapped = false;
         this.t0 = performance.now();
         this.lastKey = 0;
         this.g = this.el.canvas.getContext('2d');
 
         window.addEventListener('resize', () => this.resize());
         this.resize();
+        window.addEventListener('keydown', e => this.key(e));
+
+        // widths were measured with the fallback face until the web font arrives
+        if (document.fonts) {
+          document.fonts.load(`700 100px ${FONT}`)
+            .then(() => {
+              this.cache = {};
+              this.layout();
+            })
+            .catch(err => console.warn('Type Garden: font did not load', err));
+        }
 
         const loop = () => {
           this.raf = requestAnimationFrame(loop);
@@ -194,14 +210,196 @@
         this.dpr = d;
         c.width = Math.round(r.width * d);
         c.height = Math.round(r.height * d);
-        this.Sd = this.H * 0.28;
-        this.caretX = this.W / 2;
-        this.caretY = this.H / 2;
+        this.layout(true);
+      }
+
+      // advance width of a character at 1px type size
+      mw(ch) {
+        if (this.cache[ch] != null) return this.cache[ch];
+        this.g.font = `700 100px ${FONT}`;
+        let w = this.g.measureText(ch).width / 100;
+        if (ch === ' ') w *= 1.4;
+        return (this.cache[ch] = w);
+      }
+
+      // sets tx/ty/tw on letters; keeps headroom for the garden above and below the type
+      layoutCore(A, W, H, prevWrapped) {
+        const maxW = W * 0.8;
+        const S0 = H * 0.28;
+        const LH = 2.1;
+        const ws = A.map(l => this.mw(l.ch));
+
+        const words = [];
+        let cur = null;
+        A.forEach((l, i) => {
+          if (l.ch === ' ') {
+            if (cur) {
+              words.push(cur);
+              cur = null;
+            }
+            words.push({ sp: true, idx: [i] });
+          } else {
+            if (!cur) cur = { idx: [] };
+            cur.idx.push(i);
+          }
+        });
+        if (cur) words.push(cur);
+
+        // a line's width in px, not counting trailing spaces
+        const lineW = (li, S) => {
+          let e = li.length;
+          while (e > 0 && A[li[e - 1]].ch === ' ') e--;
+          let w = 0;
+          for (let k = 0; k < e; k++) w += ws[li[k]];
+          return w * S;
+        };
+        const wrap = S => {
+          const lines = [[]];
+          let lw = 0;
+          for (const w of words) {
+            const ww = w.idx.reduce((s, i) => s + ws[i], 0) * S;
+            if (!w.sp && lw > 0 && lw + ww > maxW) {
+              lines.push([]);
+              lw = 0;
+            }
+            lines[lines.length - 1].push(...w.idx);
+            lw += ww;
+          }
+          return lines;
+        };
+
+        let lines = [A.map((_, i) => i)];
+        const unit = lineW(lines[0], 1);
+        let S = unit > 0 ? Math.min(S0, maxW / unit) : S0;
+        const multi = words.filter(w => !w.sp).length > 1;
+        // wrap once a single line would get too small; the higher bar to unwrap stops it flickering
+        let wrapped = multi && (S < H * 0.1 || (prevWrapped && S < H * 0.14));
+        if (wrapped) {
+          // largest size whose wrapped lines all fit
+          let lo = H * 0.03;
+          let hi = H * 0.15;
+          for (let k = 0; k < 22; k++) {
+            const mid = (lo + hi) / 2;
+            const ls = wrap(mid);
+            const ok = ls.every(li => lineW(li, mid) <= maxW) && ls.length * LH * mid <= H * 0.82;
+            if (ok) lo = mid;
+            else hi = mid;
+          }
+          S = lo;
+          lines = wrap(S);
+          if (lines.length < 2) wrapped = false;
+        }
+
+        const n = lines.length;
+        const lh = LH * S;
+        lines.forEach((li, k) => {
+          let x = W / 2 - lineW(li, S) / 2;
+          const y = H / 2 + (k - (n - 1) / 2) * lh + 0.33 * S;
+          li.forEach(i => {
+            const l = A[i];
+            const w = ws[i] * S;
+            l.tx = x + w / 2;
+            l.ty = y;
+            l.tw = w;
+            l.line = k;
+            x += w;
+          });
+        });
+        return { S, wrapped, n };
+      }
+
+      // new targets for every living letter; snap skips the glide (first paint, resize)
+      layout(snap) {
+        if (!this.W) return;
+        const A = this.letters.filter(l => !l.dead);
+        const res = this.layoutCore(A, this.W, this.H, this.wrapped);
+        this.wrapped = res.wrapped;
+        A.forEach(l => {
+          if (l.x == null) {
+            l.x = l.tx;
+            l.y = l.ty;
+          }
+        });
+        const S = res.S;
+        const last = A[A.length - 1];
+        this.St = S;
+        this.caretTX = last ? last.tx + last.tw / 2 + 0.07 * S : this.W / 2;
+        this.caretTY = last ? last.ty - 0.33 * S : this.H / 2;
+        if (snap || !this.Sd) {
+          this.Sd = S;
+          this.caretX = this.caretTX;
+          this.caretY = this.caretTY;
+          A.forEach(l => {
+            l.x = l.tx;
+            l.y = l.ty;
+          });
+        }
+      }
+
+      // ---------- input ----------
+      key(e) {
+        if (this.state.mode !== 'type') return;
+        if (e.metaKey || e.ctrlKey || e.altKey) return;
+        if (e.target && e.target.tagName === 'BUTTON' && (e.key === 'Enter' || e.key === ' ')) return;
+        const now = performance.now();
+        if (e.key === 'Backspace') {
+          e.preventDefault();
+          this.mark();
+          this.wither(now);
+          return;
+        }
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          this.mark();
+          this.clear();
+          return;
+        }
+        if (!e.key || e.key.length !== 1) return;
+        e.preventDefault();
+        this.mark();
+        this.add(e.key, now);
+      }
+
+      mark() {
+        this.lastKey = performance.now();
+      }
+
+      add(ch, now) {
+        this.letters.push({ ch, id: this.uid++, birth: now });
+        this.layout();
+      }
+
+      wither(now) {
+        const A = this.letters.filter(l => !l.dead);
+        const last = A[A.length - 1];
+        if (!last) return;
+        last.dead = now;
+        this.layout();
+      }
+
+      clear() {
+        this.letters = [];
+        this.layout();
       }
 
       // ---------- render ----------
       frame() {
-        this.paint(performance.now(), true);
+        const now = performance.now();
+        const dt = Math.min(64, now - (this.lt || now));
+        this.lt = now;
+        // everything glides to its new place with the same time constant
+        const k = 1 - Math.exp(-dt / 80);
+        this.Sd += (this.St - this.Sd) * k;
+        this.caretX += (this.caretTX - this.caretX) * k;
+        this.caretY += (this.caretTY - this.caretY) * k;
+        for (const l of this.letters) {
+          if (!l.dead && l.tx != null) {
+            l.x += (l.tx - l.x) * k;
+            l.y += (l.ty - l.y) * k;
+          }
+        }
+        this.letters = this.letters.filter(l => !(l.dead && now - l.dead > 300));
+        this.paint(now, true);
       }
 
       pal() {
@@ -217,6 +415,7 @@
         g.fillStyle = this.pal().bg;
         g.fillRect(0, 0, this.W, this.H);
         const B = this.backend(g);
+        this.render(B, now, { letters: this.letters, S: this.Sd, C });
         if (caret) {
           // solid while typing, blinking when idle; grows in on first load
           const S = this.Sd;
@@ -227,6 +426,12 @@
             const w = Math.max(2, S * 0.03);
             B.rect(this.caretX - w / 2, this.caretY - h / 2, w, h, C.text);
           }
+        }
+      }
+
+      render(B, now, st) {
+        for (const l of st.letters) {
+          if (l.ch !== ' ' && !l.dead) B.text(l.ch, l.x, l.y, st.S, st.C.text);
         }
       }
     }
