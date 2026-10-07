@@ -1,0 +1,237 @@
+<!doctype html>
+<!--
+  Type Garden, remixed. As you type, stems and roses grow out of the letters.
+  After Type Garden by Akshat Agarwal (https://type-garden.vercel.app, https://x.com/art_akshat).
+  One self-contained file: canvas + plain JavaScript, no build step.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <title>Type Garden</title>
+  <meta name="description" content="Type, and a garden grows from your letters. Space cuts the stems, backspace withers them, enter clears.">
+  <meta name="theme-color" content="#000000">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+  <style>
+    html,
+    body {
+      margin: 0;
+      height: 100%;
+      background: #000;
+      overflow: hidden;
+      overscroll-behavior: none;
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+
+    .tg-app {
+      position: fixed;
+      inset: 0;
+      background: #000;
+      cursor: text;
+      font-family: 'DM Mono', ui-monospace, monospace;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    .tg-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* the real text field stays offscreen-small so phones still raise a keyboard */
+    .tg-input {
+      position: fixed;
+      left: 0;
+      top: 0;
+      width: 1px;
+      height: 1px;
+      margin: 0;
+      padding: 0;
+      border: 0;
+      opacity: 0;
+      font-size: 16px;
+      color: transparent;
+      background: transparent;
+      caret-color: transparent;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="tg-app">
+    <canvas class="tg-canvas"></canvas>
+    <input class="tg-input" aria-label="Type to grow a garden" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false">
+  </div>
+
+  <script>
+    'use strict';
+
+    const FONT = '"Playfair Display", Georgia, serif';
+
+    // name, background, flower, stem & leaf, flower line, type
+    const PALETTES = [
+      ['Rose noir', '#000000', '#FF1400', '#3257FF', '#FFB4A8', '#FFFFFF'],
+      ['Paper', '#F3EEE4', '#FF3B1F', '#1C2B8F', '#FFD2C4', '#111111'],
+      ['Midnight', '#0D1B4C', '#FF5A4E', '#9FB4FF', '#FFD6CF', '#FFFFFF'],
+      ['Citrus', '#0E1A12', '#FF8A00', '#1FA463', '#FFE2B8', '#FFF6E8'],
+      ['Orchid', '#140A1F', '#E63CFF', '#2FB8A6', '#F9D1FF', '#FFFFFF'],
+      ['Moss', '#133A2A', '#FFB7C5', '#7FD18B', '#FFFFFF', '#F6F1E7'],
+      ['Tomato', '#FF1400', '#FFF1E0', '#0B0B0B', '#FF1400', '#000000'],
+      ['Butter', '#FFE9A8', '#E4002B', '#0F5132', '#FFC2C2', '#1A1A1A'],
+      ['Blush', '#FAD4D8', '#C8102E', '#274690', '#FFE3E6', '#1A1A1A'],
+      ['Mono', '#000000', '#F2F2F2', '#6E6E6E', '#000000', '#FFFFFF']
+    ];
+
+    class TypeGarden {
+      constructor() {
+        this.state = { mode: 'type', palette: 0 };
+        this.el = {
+          app: document.querySelector('.tg-app'),
+          canvas: document.querySelector('.tg-canvas'),
+          input: document.querySelector('.tg-input')
+        };
+        this.mount();
+      }
+
+      mount() {
+        this.Sd = 0;
+        this.t0 = performance.now();
+        this.lastKey = 0;
+        this.g = this.el.canvas.getContext('2d');
+
+        window.addEventListener('resize', () => this.resize());
+        this.resize();
+
+        const loop = () => {
+          this.raf = requestAnimationFrame(loop);
+          this.frame();
+        };
+        loop();
+        setTimeout(() => this.el.input.focus({ preventScroll: true }), 50);
+      }
+
+      // ---------- math ----------
+      // ease-out cubic, clamped to 0..1
+      eo(t) {
+        if (t <= 0) return 0;
+        if (t >= 1) return 1;
+        return 1 - Math.pow(1 - t, 3);
+      }
+
+      // smooth a polyline through its midpoints with quadratic curves
+      path(c, p, closed) {
+        const n = p.length;
+        if (n < 2) return;
+        const m = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+        if (closed) {
+          const s = m(p[n - 1], p[0]);
+          c.moveTo(s[0], s[1]);
+          for (let i = 0; i < n; i++) {
+            const q = m(p[i], p[(i + 1) % n]);
+            c.quadraticCurveTo(p[i][0], p[i][1], q[0], q[1]);
+          }
+          c.closePath();
+        } else {
+          c.moveTo(p[0][0], p[0][1]);
+          for (let i = 1; i < n - 1; i++) {
+            const q = m(p[i], p[i + 1]);
+            c.quadraticCurveTo(p[i][0], p[i][1], q[0], q[1]);
+          }
+          c.lineTo(p[n - 1][0], p[n - 1][1]);
+        }
+      }
+
+      // the drawing calls, over a 2D context
+      backend(g) {
+        return {
+          fill: (p, col) => {
+            g.beginPath();
+            this.path(g, p, true);
+            g.fillStyle = col;
+            g.fill();
+          },
+          stroke: (p, col, w) => {
+            g.beginPath();
+            this.path(g, p, false);
+            g.strokeStyle = col;
+            g.lineWidth = w;
+            g.lineCap = 'round';
+            g.lineJoin = 'round';
+            g.stroke();
+          },
+          rect: (x, y, w, h, col) => {
+            g.fillStyle = col;
+            g.fillRect(x, y, w, h);
+          },
+          text: (ch, x, y, S, col) => {
+            g.font = `700 ${S}px ${FONT}`;
+            g.textAlign = 'center';
+            g.textBaseline = 'alphabetic';
+            g.fillStyle = col;
+            g.fillText(ch, x, y);
+          }
+        };
+      }
+
+      // ---------- layout ----------
+      resize() {
+        const c = this.el.canvas;
+        const r = c.getBoundingClientRect();
+        const d = window.devicePixelRatio || 1;
+        if (!r.width) return;
+        this.W = r.width;
+        this.H = r.height;
+        this.dpr = d;
+        c.width = Math.round(r.width * d);
+        c.height = Math.round(r.height * d);
+        this.Sd = this.H * 0.28;
+        this.caretX = this.W / 2;
+        this.caretY = this.H / 2;
+      }
+
+      // ---------- render ----------
+      frame() {
+        this.paint(performance.now(), true);
+      }
+
+      pal() {
+        const p = PALETTES[this.state.palette] || PALETTES[0];
+        return { bg: p[1], C: { red: p[2], blue: p[3], line: p[4], text: p[5], vein: p[1] } };
+      }
+
+      paint(now, caret) {
+        const g = this.g;
+        const d = this.dpr;
+        const C = this.pal().C;
+        g.setTransform(d, 0, 0, d, 0, 0);
+        g.fillStyle = this.pal().bg;
+        g.fillRect(0, 0, this.W, this.H);
+        const B = this.backend(g);
+        if (caret) {
+          // solid while typing, blinking when idle; grows in on first load
+          const S = this.Sd;
+          const on = now - this.lastKey < 500 || Math.floor(now / 530) % 2 === 0;
+          const hf = this.eo((now - this.t0) / 600);
+          if (on && hf > 0) {
+            const h = 0.8 * S * hf;
+            const w = Math.max(2, S * 0.03);
+            B.rect(this.caretX - w / 2, this.caretY - h / 2, w, h, C.text);
+          }
+        }
+      }
+    }
+
+    new TypeGarden();
+  </script>
+</body>
+</html>
